@@ -174,8 +174,70 @@ func main() {
 		json.NewEncoder(w).Encode(rsp)
 	}
 
+	var likeNFTByIP = func(w http.ResponseWriter, r *http.Request) {
+		params := mux.Vars(r)
+		id, _ := strconv.Atoi(params["id"])
+		ip := r.RemoteAddr
+		tx, _ := db.Begin()
+		stmt, _ := tx.Prepare("INSERT OR REPLACE INTO nft_top (id, ip_address) VALUES (?,?)")
+		_, _ = stmt.Exec(id, ip)
+		_ = tx.Commit()
+		var count int
+		_ = db.QueryRow("SELECT COUNT(*) FROM nft_top WHERE id =?", id).Scan(&count)
+
+		rsp := StdRes{
+			Status: STATUS[1],
+			Data: struct {
+				Likes int `json:"likes"`
+			}{Likes: count},
+			Message: "NFT like successfully recorded from IP address",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(rsp)
+	}
+
+	var dislikeNFTByIP = func(w http.ResponseWriter, r *http.Request) {
+		params := mux.Vars(r)
+		id, _ := strconv.Atoi(params["id"])
+		ip := r.RemoteAddr
+		tx, _ := db.Begin()
+		stmt, _ := tx.Prepare("DELETE FROM nft_top WHERE id =? AND ip_address =?")
+		_, _ = stmt.Exec(id, ip)
+		_ = tx.Commit()
+		var count int
+		_ = db.QueryRow("SELECT COUNT(*) FROM nft_top WHERE id =?", id).Scan(&count)
+
+		rsp := StdRes{
+			Status: STATUS[1],
+			Data: struct {
+				Likes int `json:"likes"`
+			}{Likes: count},
+			Message: "NFT dislike successfully recorded from IP address",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(rsp)
+	}
+
+	var getLikesByNFTID = func(w http.ResponseWriter, r *http.Request) {
+		params := mux.Vars(r)
+		id, _ := strconv.Atoi(params["id"])
+		var count int
+		_ = db.QueryRow("SELECT COUNT(*) FROM nft_top WHERE id =?", id).Scan(&count)
+
+		rsp := StdRes{
+			Status: STATUS[1],
+			Data: struct {
+				Likes int `json:"likes"`
+			}{Likes: count},
+			Message: "Total NFT likes retrieved successfully",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(rsp)
+	}
+
 	var updateDBNFT = func() {
-		_, err = db.Exec(`CREATE TABLE IF NOT EXISTS nft (id INTEGER, owner TEXT, token_uri TEXT)`)
+		_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS nft_top (id INTEGER, ip_address TEXT)`)
+		_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS nft (id INTEGER, owner TEXT, token_uri TEXT)`)
 		tx, _ := db.Begin()
 		stmt, _ := tx.Prepare("INSERT OR REPLACE INTO nft (id, owner, token_uri) VALUES (?,?,?)")
 		i := 1
@@ -187,7 +249,7 @@ func main() {
 				break
 			}
 			turi, _ := token.TokenURI(nil, bi)
-			_, err = stmt.Exec(strconv.Itoa(i), own.String(), turi)
+			_, _ = stmt.Exec(strconv.Itoa(i), own.String(), turi)
 			i++
 		}
 		_ = tx.Commit()
@@ -217,5 +279,8 @@ func main() {
 	r.HandleFunc("/nfts", getTotalNFTs).Methods("GET")
 	r.HandleFunc("/nfts/owner/{owner}", searchNFTByOwner).Methods("GET")
 	r.HandleFunc("/nfts/{id}/owner", getOwnerByNFTID).Methods("GET")
+	r.HandleFunc("/nfts/{id}/like", getLikesByNFTID).Methods("GET")
+	r.HandleFunc("/nfts/{id}/like", getOwnerByNFTID).Methods("POST")
+	r.HandleFunc("/nfts/{id}/dislike", getOwnerByNFTID).Methods("DELETE")
 	http.ListenAndServe(":8000", r)
 }
