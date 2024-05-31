@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -181,7 +182,7 @@ func main() {
 		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 		tx, _ := db.Begin()
 		stmt, _ := tx.Prepare("INSERT OR REPLACE INTO nft_top (id, ip_address) VALUES (?,?)")
-		_, _ = stmt.Exec(id, ip)
+		_, _ = stmt.Exec(id, base64.StdEncoding.EncodeToString([]byte(ip)))
 		_ = tx.Commit()
 		var count int
 		_ = db.QueryRow("SELECT COUNT(*) FROM nft_top WHERE id =?", id).Scan(&count)
@@ -203,7 +204,7 @@ func main() {
 		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 		tx, _ := db.Begin()
 		stmt, _ := tx.Prepare("DELETE FROM nft_top WHERE id =? AND ip_address =?")
-		_, _ = stmt.Exec(id, ip)
+		_, _ = stmt.Exec(id, base64.StdEncoding.EncodeToString([]byte(ip)))
 		_ = tx.Commit()
 		var count int
 		_ = db.QueryRow("SELECT COUNT(*) FROM nft_top WHERE id =?", id).Scan(&count)
@@ -237,7 +238,7 @@ func main() {
 	}
 
 	var updateDBNFT = func() {
-		_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS nft_top (id INTEGER, ip_address TEXT)`)
+		_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS nft_top (id INTEGER, ip_address TEXT, UNIQUE (id, ip_address) ON CONFLICT REPLACE);`)
 		_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS nft (id INTEGER, owner TEXT, token_uri TEXT)`)
 		tx, _ := db.Begin()
 		stmt, _ := tx.Prepare("INSERT OR REPLACE INTO nft (id, owner, token_uri) VALUES (?,?,?)")
