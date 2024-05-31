@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"math/big"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -177,7 +178,7 @@ func main() {
 	var likeNFTByIP = func(w http.ResponseWriter, r *http.Request) {
 		params := mux.Vars(r)
 		id, _ := strconv.Atoi(params["id"])
-		ip := r.RemoteAddr
+		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 		tx, _ := db.Begin()
 		stmt, _ := tx.Prepare("INSERT OR REPLACE INTO nft_top (id, ip_address) VALUES (?,?)")
 		_, _ = stmt.Exec(id, ip)
@@ -199,7 +200,7 @@ func main() {
 	var dislikeNFTByIP = func(w http.ResponseWriter, r *http.Request) {
 		params := mux.Vars(r)
 		id, _ := strconv.Atoi(params["id"])
-		ip := r.RemoteAddr
+		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 		tx, _ := db.Begin()
 		stmt, _ := tx.Prepare("DELETE FROM nft_top WHERE id =? AND ip_address =?")
 		_, _ = stmt.Exec(id, ip)
