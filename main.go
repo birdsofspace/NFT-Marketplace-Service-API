@@ -280,7 +280,7 @@ func main() {
 	r.HandleFunc("/nfts/owner/{owner}", searchNFTByOwner).Methods("GET")
 	r.HandleFunc("/nfts/{id}/owner", getOwnerByNFTID).Methods("GET")
 	r.HandleFunc("/nfts/{id}/like", getLikesByNFTID).Methods("GET")
-	r.HandleFunc("/nfts/{id}/like", getOwnerByNFTID).Methods("POST")
-	r.HandleFunc("/nfts/{id}/dislike", getOwnerByNFTID).Methods("DELETE")
+	r.HandleFunc("/nfts/{id}/like", likeNFTByIP).Methods("POST")
+	r.HandleFunc("/nfts/{id}/dislike", dislikeNFTByIP).Methods("DELETE")
 	http.ListenAndServe(":8000", r)
 }
