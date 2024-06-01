@@ -85,7 +85,7 @@ type LogNewItem struct {
 }
 
 func main() {
-	var chain_selected int = 127
+	var chain_selected int = 137
 	var STATUS []string = []string{"failed", "success"}
 
 	var getRPC = func(chid int) string {
@@ -147,6 +147,14 @@ func main() {
 		return string(body)
 	}
 
+	var getNFTAddress = func(chid int) string {
+		id := strconv.Itoa(chid)
+		resp, _ := http.Get("https://raw.githubusercontent.com/birdsofspace/global-config/main/" + id + "/ERC-721/CONTRACT_ADDRESS")
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		return string(body)
+	}
+
 	db, _ := sql.Open("sqlite3", "./"+strconv.Itoa(chain_selected)+"nft.db")
 	defer db.Close()
 	null_address := common.HexToAddress("0x0000000000000000000000000000000000000000")
@@ -155,7 +163,7 @@ func main() {
 		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
 	}
 
-	address := common.HexToAddress("0xbd71d373556867dbb589f2c7cc464882fafd52be")
+	address := common.HexToAddress(getNFTAddress(chain_selected))
 	token, err := erc721.NewErc721(address, conn)
 	if err != nil {
 		log.Fatalf("Failed to instantiate a Token contract: %v", err)
