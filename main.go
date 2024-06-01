@@ -85,6 +85,7 @@ type LogNewItem struct {
 }
 
 func main() {
+	var port string = "1370"
 	var chain_selected int = 137
 	var STATUS []string = []string{"failed", "success"}
 
@@ -437,5 +438,5 @@ func main() {
 	r.HandleFunc("/nfts/{id}/like", likeNFTByIP).Methods("POST")
 	r.HandleFunc("/nfts/{id}/like", dislikeNFTByIP).Methods("DELETE")
 	r.HandleFunc("/notifications/user/{owner}", getNotificationByOwner).Methods("GET")
-	http.ListenAndServe(":8000", r)
+	http.ListenAndServe(":"+port, r)
 }
