@@ -85,8 +85,8 @@ type LogNewItem struct {
 }
 
 func main() {
-	var port string = "1370"
-	var chain_selected int = 137
+	var port string = "8453"
+	var chain_selected int = 8453
 	var STATUS []string = []string{"failed", "success"}
 
 	var getRPC = func(chid int) string {
@@ -170,13 +170,6 @@ func main() {
 		log.Fatalf("Failed to instantiate a Token contract: %v", err)
 	}
 
-	name, err := token.Name(nil)
-	if err != nil {
-		log.Fatalf("Failed to retrieve token name: %v", err)
-	}
-	fmt.Println("Token name:", name)
-	balance, _ := token.BalanceOf(nil, address)
-	println(balance.Int64())
 
 	var getTotalNFTs = func(w http.ResponseWriter, r *http.Request) {
 		var t int = 0
