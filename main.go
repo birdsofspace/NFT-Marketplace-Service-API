@@ -133,7 +133,8 @@ func main() {
 
 	var getABI = func(chid int) abi.ABI {
 		id := strconv.Itoa(chid)
-		resp, _ := http.Get("https://raw.githubusercontent.com/birdsofspace/global-config/main/" + id + "/MARKETPLACE/ABI.json")
+		t := time.Now().Unix()
+		resp, _ := http.Get("https://raw.githubusercontent.com/birdsofspace/global-config/main/" + id + "/MARKETPLACE/ABI.json?time=" + strconv.FormatInt(t, 10))
 		defer resp.Body.Close()
 		body, _ := io.ReadAll(resp.Body)
 		contractAbi, _ := abi.JSON(strings.NewReader(string(body)))
@@ -142,18 +143,20 @@ func main() {
 
 	var getMarketAddress = func(chid int) string {
 		id := strconv.Itoa(chid)
-		resp, _ := http.Get("https://raw.githubusercontent.com/birdsofspace/global-config/main/" + id + "/MARKETPLACE/CONTRACT_ADDRESS")
+		t := time.Now().Unix()
+		resp, _ := http.Get("https://raw.githubusercontent.com/birdsofspace/global-config/main/" + id + "/MARKETPLACE/CONTRACT_ADDRESS?time=" + strconv.FormatInt(t, 10))
 		defer resp.Body.Close()
 		body, _ := io.ReadAll(resp.Body)
-		return string(body)
+		return strings.TrimSpace(string(body))
 	}
 
 	var getNFTAddress = func(chid int) string {
 		id := strconv.Itoa(chid)
-		resp, _ := http.Get("https://raw.githubusercontent.com/birdsofspace/global-config/main/" + id + "/ERC-721/CONTRACT_ADDRESS")
+		t := time.Now().Unix()
+		resp, _ := http.Get("https://raw.githubusercontent.com/birdsofspace/global-config/main/" + id + "/ERC-721/CONTRACT_ADDRESS?time=" + strconv.FormatInt(t, 10))
 		defer resp.Body.Close()
 		body, _ := io.ReadAll(resp.Body)
-		return string(body)
+		return strings.TrimSpace(string(body))
 	}
 
 	db, _ := sql.Open("sqlite3", "./"+strconv.Itoa(chain_selected)+"nft.db")
@@ -163,13 +166,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
 	}
-
-	address := common.HexToAddress(getNFTAddress(chain_selected))
+	address := common.HexToAddress(getNFTAddress(8453))
 	token, err := erc721.NewErc721(address, conn)
 	if err != nil {
 		log.Fatalf("Failed to instantiate a Token contract: %v", err)
 	}
 
+	name, err := token.Name(nil)
+	if err != nil {
+		log.Fatalf("Failed to retrieve token name: %v", err)
+	}
+	fmt.Println("Token name:", name)
+	balance, _ := token.BalanceOf(nil, address)
+	println(balance.Int64())
 
 	var getTotalNFTs = func(w http.ResponseWriter, r *http.Request) {
 		var t int = 0
