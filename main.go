@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -17,6 +18,8 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gorilla/mux"
@@ -58,6 +61,21 @@ type ResTotalNFTs struct {
 
 type ResOwnerNFT struct {
 	Owner string `json:"owner"`
+}
+
+type LogSold struct {
+	ItemId *big.Int       `json:"item_id"`
+	Owner  common.Address `json:"owner"`
+}
+
+type LogNewItem struct {
+	ItemId      *big.Int
+	NFTContract common.Address
+	TokenId     *big.Int
+	Seller      common.Address
+	Owner       common.Address
+	Price       *big.Int
+	Sold        bool
 }
 
 func main() {
@@ -102,7 +120,25 @@ func main() {
 		}
 		testCon.Close()
 		println(fastestRpc)
+		fastestRpc = chain.RPC[0]
 		return fastestRpc
+	}
+
+	var getABI = func(chid int) abi.ABI {
+		id := strconv.Itoa(chid)
+		resp, _ := http.Get("https://raw.githubusercontent.com/birdsofspace/global-config/main/" + id + "/MARKETPLACE/ABI.json")
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		contractAbi, _ := abi.JSON(strings.NewReader(string(body)))
+		return contractAbi
+	}
+
+	var getMarketAddress = func(chid int) string {
+		id := strconv.Itoa(chid)
+		resp, _ := http.Get("https://raw.githubusercontent.com/birdsofspace/global-config/main/" + id + "/MARKETPLACE/CONTRACT_ADDRESS")
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		return string(body)
 	}
 
 	db, _ := sql.Open("sqlite3", "./nft.db")
@@ -258,6 +294,44 @@ func main() {
 
 	}
 
+	var lastSold = func(w http.ResponseWriter, r *http.Request) {
+		params := mux.Vars(r)
+		var block int64
+		fmt.Sscan(params["block"], &block)
+		fmt.Print(params["block"])
+		blockNum, _ := conn.HeaderByNumber(context.Background(), nil)
+		if block == 0 {
+			block = blockNum.Number.Int64()
+		}
+
+		querySold := ethereum.FilterQuery{
+			FromBlock: big.NewInt(block - 1000),
+			ToBlock:   big.NewInt(block),
+			Addresses: []common.Address{
+				common.HexToAddress(getMarketAddress(137)),
+			},
+		}
+
+		logs, _ := conn.FilterLogs(context.Background(), querySold)
+		var data []LogSold
+		for _, vLog := range logs {
+			switch vLog.Topics[0].Hex() {
+			case "0x045dfa01dcba2b36aba1d3dc4a874f4b0c5d2fbeb8d2c4b34a7d88c8d8f929d1":
+				var LogSoldf LogSold
+				LogSoldf.ItemId = (vLog.Topics[1].Big())
+				LogSoldf.Owner = common.HexToAddress(vLog.Topics[2].Hex())
+				data = append(data, LogSoldf)
+			}
+		}
+		rsp := StdRes{
+			Status:  STATUS[1],
+			Data:    data,
+			Message: "Log Sold Out retrieved successfully",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(rsp)
+	}
+
 	var updateInBackground = func(w http.ResponseWriter, r *http.Request) {
 
 		updateChannel := make(chan struct{})
@@ -276,9 +350,12 @@ func main() {
 
 	}
 
+	_ = getABI(137)
+
 	r := mux.NewRouter()
 	r.HandleFunc("/nfts", updateInBackground).Methods("PATCH")
 	r.HandleFunc("/nfts", getTotalNFTs).Methods("GET")
+	r.HandleFunc("/nfts/sold/{block}", lastSold).Methods("GET")
 	r.HandleFunc("/nfts/owner/{owner}", searchNFTByOwner).Methods("GET")
 	r.HandleFunc("/nfts/{id}/owner", getOwnerByNFTID).Methods("GET")
 	r.HandleFunc("/nfts/{id}/like", getLikesByNFTID).Methods("GET")
