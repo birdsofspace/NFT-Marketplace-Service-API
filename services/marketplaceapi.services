@@ -1,0 +1,11 @@
+[Unit]
+Description=Birds of Space Marketplace API
+After=network.target
+
+[Service]
+User=birdsofspace
+ExecStart=/home/birdsofspace-project/marketplace-api.birdsofspace.com/main.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
