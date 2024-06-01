@@ -85,7 +85,7 @@ type LogNewItem struct {
 }
 
 func main() {
-
+	var chain_selected int = 127
 	var STATUS []string = []string{"failed", "success"}
 
 	var getRPC = func(chid int) string {
@@ -147,10 +147,10 @@ func main() {
 		return string(body)
 	}
 
-	db, _ := sql.Open("sqlite3", "./nft.db")
+	db, _ := sql.Open("sqlite3", "./"+strconv.Itoa(chain_selected)+"nft.db")
 	defer db.Close()
 	null_address := common.HexToAddress("0x0000000000000000000000000000000000000000")
-	conn, err := ethclient.Dial(getRPC(137))
+	conn, err := ethclient.Dial(getRPC(chain_selected))
 	if err != nil {
 		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
 	}
@@ -302,7 +302,7 @@ func main() {
 	}
 
 	qL := ethereum.FilterQuery{
-		Addresses: []common.Address{common.HexToAddress(getMarketAddress(137))},
+		Addresses: []common.Address{common.HexToAddress(getMarketAddress(chain_selected))},
 	}
 
 	sB, _ := conn.FilterLogs(context.Background(), qL)
@@ -375,7 +375,7 @@ func main() {
 			FromBlock: big.NewInt(block - 1000),
 			ToBlock:   big.NewInt(block),
 			Addresses: []common.Address{
-				common.HexToAddress(getMarketAddress(137)),
+				common.HexToAddress(getMarketAddress(chain_selected)),
 			},
 		}
 
@@ -417,7 +417,7 @@ func main() {
 
 	}
 
-	_ = getABI(137)
+	defer getABI(chain_selected)
 
 	r := mux.NewRouter()
 	r.HandleFunc("/nfts", updateInBackground).Methods("PATCH")
