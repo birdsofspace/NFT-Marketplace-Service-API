@@ -21,7 +21,6 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gorilla/mux"
 	"github.com/metachris/eth-go-bindings/erc721"
@@ -103,7 +102,7 @@ func main() {
 		var fastestTime time.Duration
 		fastestRpc = chain.RPC[0]
 		for _, rpc := range chain.RPC {
-			if strings.Contains(rpc, "https") {
+			if strings.Contains(rpc, "wss") {
 				start := time.Now()
 
 				testCon, err := ethclient.Dial(rpc)
@@ -305,24 +304,39 @@ func main() {
 	qL := ethereum.FilterQuery{
 		Addresses: []common.Address{common.HexToAddress(getMarketAddress(137))},
 	}
-	l := make(chan types.Log)
-	sB, _ := conn.SubscribeFilterLogs(context.Background(), qL, l)
+
+	sB, _ := conn.FilterLogs(context.Background(), qL)
 
 	go func() {
 		for {
-			select {
-			case err := <-sB.Err():
-				log.Fatal(err)
-			case vLog := <-l:
+			for _, vLog := range sB {
 				switch vLog.Topics[0].Hex() {
 				case "0x045dfa01dcba2b36aba1d3dc4a874f4b0c5d2fbeb8d2c4b34a7d88c8d8f929d1":
 					var LogSoldf LogSold
 					LogSoldf.ItemId = (vLog.Topics[1].Big())
 					LogSoldf.Owner = common.HexToAddress(vLog.Topics[2].Hex())
-					tx, _ := db.Begin()
-					stmt, _ := tx.Prepare("INSERT OR REPLACE INTO nft_notification (id, owner, block) VALUES (?,?,?)")
-					_, _ = stmt.Exec(LogSoldf.ItemId.Int64(), base64.StdEncoding.EncodeToString([]byte(LogSoldf.Owner.String())), vLog.BlockNumber)
-					_ = tx.Commit()
+
+					tx, err := db.Begin()
+					if err != nil {
+						fmt.Println("Failed to begin transaction:", err)
+						continue
+					}
+
+					stmt, err := tx.Prepare("INSERT OR REPLACE INTO nft_notification (id, owner, block) VALUES (?,?,?)")
+					if err != nil {
+						fmt.Println("Failed to prepare statement:", err)
+						continue
+					}
+
+					_, err = stmt.Exec(LogSoldf.ItemId.Int64(), base64.StdEncoding.EncodeToString([]byte(LogSoldf.Owner.String())), vLog.BlockNumber)
+					if err != nil {
+						fmt.Println("Failed to execute statement:", err)
+						continue
+					}
+
+					if err := tx.Commit(); err != nil {
+						fmt.Println("Failed to commit transaction:", err)
+					}
 				}
 			}
 		}
@@ -352,7 +366,6 @@ func main() {
 		params := mux.Vars(r)
 		var block int64
 		fmt.Sscan(params["block"], &block)
-		fmt.Print(params["block"])
 		blockNum, _ := conn.HeaderByNumber(context.Background(), nil)
 		if block == 0 {
 			block = blockNum.Number.Int64()
@@ -414,7 +427,7 @@ func main() {
 	r.HandleFunc("/nfts/{id}/owner", getOwnerByNFTID).Methods("GET")
 	r.HandleFunc("/nfts/{id}/like", getLikesByNFTID).Methods("GET")
 	r.HandleFunc("/nfts/{id}/like", likeNFTByIP).Methods("POST")
-	r.HandleFunc("/nfts/{id}/dislike", dislikeNFTByIP).Methods("DELETE")
+	r.HandleFunc("/nfts/{id}/like", dislikeNFTByIP).Methods("DELETE")
 	r.HandleFunc("/notifications/user/{owner}", getNotificationByOwner).Methods("GET")
 	http.ListenAndServe(":8000", r)
 }
