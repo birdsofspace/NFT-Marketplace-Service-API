@@ -296,7 +296,7 @@ func main() {
 		_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS nft (id INTEGER, owner TEXT, token_uri TEXT)`)
 		tx, _ := db.Begin()
 		stmt, _ := tx.Prepare("INSERT OR REPLACE INTO nft (id, owner, token_uri) VALUES (?,?,?)")
-		i := 1
+		i := 0
 
 		for {
 			bi := big.NewInt(int64(i))
