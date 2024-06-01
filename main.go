@@ -21,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gorilla/mux"
 	"github.com/metachris/eth-go-bindings/erc721"
@@ -66,6 +67,12 @@ type ResOwnerNFT struct {
 type LogSold struct {
 	ItemId *big.Int       `json:"item_id"`
 	Owner  common.Address `json:"owner"`
+}
+
+type LogSoldWithBlock struct {
+	ItemId   *big.Int       `json:"item_id"`
+	Owner    common.Address `json:"owner"`
+	BlockNum *big.Int       `json:"block"`
 }
 
 type LogNewItem struct {
@@ -274,6 +281,7 @@ func main() {
 	}
 
 	var updateDBNFT = func() {
+		_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS nft_notification (id INTEGER, owner TEXT, block INTEGER, UNIQUE (id, owner, block) ON CONFLICT REPLACE);`)
 		_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS nft_top (id INTEGER, ip_address TEXT, UNIQUE (id, ip_address) ON CONFLICT REPLACE);`)
 		_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS nft (id INTEGER, owner TEXT, token_uri TEXT)`)
 		tx, _ := db.Begin()
@@ -292,6 +300,52 @@ func main() {
 		}
 		_ = tx.Commit()
 
+	}
+
+	qL := ethereum.FilterQuery{
+		Addresses: []common.Address{common.HexToAddress(getMarketAddress(137))},
+	}
+	l := make(chan types.Log)
+	sB, _ := conn.SubscribeFilterLogs(context.Background(), qL, l)
+
+	go func() {
+		for {
+			select {
+			case err := <-sB.Err():
+				log.Fatal(err)
+			case vLog := <-l:
+				switch vLog.Topics[0].Hex() {
+				case "0x045dfa01dcba2b36aba1d3dc4a874f4b0c5d2fbeb8d2c4b34a7d88c8d8f929d1":
+					var LogSoldf LogSold
+					LogSoldf.ItemId = (vLog.Topics[1].Big())
+					LogSoldf.Owner = common.HexToAddress(vLog.Topics[2].Hex())
+					tx, _ := db.Begin()
+					stmt, _ := tx.Prepare("INSERT OR REPLACE INTO nft_notification (id, owner, block) VALUES (?,?,?)")
+					_, _ = stmt.Exec(LogSoldf.ItemId.Int64(), base64.StdEncoding.EncodeToString([]byte(LogSoldf.Owner.String())), vLog.BlockNumber)
+					_ = tx.Commit()
+				}
+			}
+		}
+	}()
+
+	var getNotificationByOwner = func(w http.ResponseWriter, r *http.Request) {
+		params := mux.Vars(r)
+		own := params["owner"]
+		rows, _ := db.Query("SELECT * FROM nft_notification WHERE owner =?", own)
+		defer rows.Close()
+		var results []LogSoldWithBlock
+		for rows.Next() {
+			var result LogSoldWithBlock
+			_ = rows.Scan(&result.ItemId, &result.Owner, &result.BlockNum)
+			results = append(results, result)
+		}
+		rsp := StdRes{
+			Status:  STATUS[1],
+			Data:    results,
+			Message: "Successfully fetched notifications!",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(rsp)
 	}
 
 	var lastSold = func(w http.ResponseWriter, r *http.Request) {
@@ -361,5 +415,6 @@ func main() {
 	r.HandleFunc("/nfts/{id}/like", getLikesByNFTID).Methods("GET")
 	r.HandleFunc("/nfts/{id}/like", likeNFTByIP).Methods("POST")
 	r.HandleFunc("/nfts/{id}/dislike", dislikeNFTByIP).Methods("DELETE")
+	r.HandleFunc("/notifications/user/{owner}", getNotificationByOwner).Methods("GET")
 	http.ListenAndServe(":8000", r)
 }
