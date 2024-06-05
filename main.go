@@ -293,7 +293,7 @@ func main() {
 	var updateDBNFT = func() {
 		_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS nft_notification (id INTEGER, owner TEXT, block INTEGER, UNIQUE (id, owner, block) ON CONFLICT REPLACE);`)
 		_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS nft_top (id INTEGER, ip_address TEXT, UNIQUE (id, ip_address) ON CONFLICT REPLACE);`)
-		_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS nft (id INTEGER, owner TEXT, token_uri TEXT)`)
+		_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS nft (id INTEGER, owner TEXT, token_uri TEXT, UNIQUE (id, owner) ON CONFLICT REPLACE);`)
 		tx, _ := db.Begin()
 		stmt, _ := tx.Prepare("INSERT OR REPLACE INTO nft (id, owner, token_uri) VALUES (?,?,?)")
 		i := 0
