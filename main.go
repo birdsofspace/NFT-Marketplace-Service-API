@@ -85,8 +85,8 @@ type LogNewItem struct {
 }
 
 func main() {
-	var port string = "8453"
-	var chain_selected int = 8453
+	var port string = "1370"
+	var chain_selected int = 137
 	var STATUS []string = []string{"failed", "success"}
 
 	var getRPC = func(chid int) string {
@@ -166,7 +166,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
 	}
-	address := common.HexToAddress(getNFTAddress(8453))
+	address := common.HexToAddress(getNFTAddress(chain_selected))
 	token, err := erc721.NewErc721(address, conn)
 	if err != nil {
 		log.Fatalf("Failed to instantiate a Token contract: %v", err)
